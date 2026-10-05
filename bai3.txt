@@ -1,0 +1,61 @@
+BÀI 3:THEO DÕI VÀ QUẢN LÍ TIẾN TRÌNH HỆ THỐNG(BTVN)
+1. Báo cáo phân tích hiện tượng máy chạy chậm (RAM 95%)
+a. Giải thích theo Mô hình "Ban quản lý tòa nhà"
+Phần cứng (Hardware - Tòa nhà): Cung cấp tài nguyên vật lý như diện tích mặt bằng (RAM) và kho chứa đồ (Storage/SSD/HDD).
+Kernel (Ban quản lý tòa nhà): Trực tiếp điều phối và kiểm soát diện tích mặt bằng. Khi các ứng dụng (cư dân) xin sử dụng mặt bằng, Kernel quyết định phân bổ bao nhiêu MB/GB RAM cho từng tiến trình.
+Shell / UI (Lễ tân / Bảng thông báo): Đóng vai trò giao diện tiếp nhận yêu cầu từ người dùng (như Task Manager) để hiển thị báo cáo tình trạng tài nguyên hiện tại.
+Chẩn đoán hiện tượng: Khi RAM báo 95%, "mặt bằng" của tòa nhà gần như đã bị chiếm dụng trọn vẹn bởi Chrome (thường ngốn rất nhiều RAM do mở nhiều tab/extension) và VS Code. Do thiếu không gian làm việc trống, Kernel phải liên tục thực hiện cơ chế đổi chỗ (Paging/Swapping) giữa RAM và Ổ cứng, khiến toàn hệ thống bị gián đoạn và giật lag.
+b. Báo cáo phân tích chi tiết kỹ thuật
+Chức năng Quản lý tiến trình (Process Management): Chrome và VS Code khởi tạo hàng chục tiến trình con (như GPU Process, Renderer, Extension...). Hệ điều hành phải phân chia thời gian xử lý (CPU Bound) và quản lý luồng thi hành cho các tiến trình này.
+Chức năng Quản lý bộ nhớ (Memory Management): Khi dung lượng bộ nhớ vật lý (RAM) đạt ngưỡng tới hạn 95%, hệ điều hành kích hoạt Bộ nhớ ảo (Virtual Memory) và tạo file trao đổi (Swap file / Pagefile). Hệ điều hành liên tục đọc/ghi dữ liệu tạm từ RAM sang ổ đĩa, gây ra hiện tượng nghẽn cổ đống (Disk Churning) dẫn đến máy giật lag.
+2. Luồng dữ liệu theo mô hình IPO khi nạp ứng dụng
+Khi người dùng mở một ứng dụng (ví dụ: VS Code) từ ổ cứng vào RAM, quá trình diễn ra qua 3 bước:
+Plaintext
+[ Input ] -------------> [ Process ] -------------> [ Output ]
+(Thao tác kích hoạt)      (Nạp & Phân bổ)          (Trạng thái sẵn sàng)
+
+Input (Đầu vào): Người dùng double-click vào biểu tượng ứng dụng hoặc gõ lệnh chạy trên Shell. Signal/Event được gửi đến Kernel.
+Process (Xử lý):
+Kernel định vị vị trí các file thực thi (.exe) trên Storage (HDD/SSD).
+CPU chỉ đạo đọc dữ liệu từ Storage và chép dữ liệu/mã lệnh vào bộ nhớ RAM.
+Kernel cấp phát không gian bộ nhớ (Address Space) và cấp PID (Process ID) cho tiến trình.
+Output (Đầu ra): Giao diện ứng dụng hiển thị lên màn hình, tiến trình chuyển sang trạng thái sẵn sàng (Ready/Running) trong Task Manager.
+3. Sơ đồ phân tầng (Architecture Layers) khi mở Trình duyệt
+Plaintext
++------------------------------------+
+|  USER (Người dùng click Chrome) |
++------------------------------------+
+                              |
+                              v
++------------------------------------+
+|  SHELL / GUI (Giao diện người dùng / Taskbar)  |
++------------------------------------+
+                | System Call              
+                              v
++------------------------------------+
+| KERNEL (Bộ não OS - Điều phối RAM & CPU)   |
++------------------------------------+
+                    | Device Driver          
+                              v
++------------------------------------+
+|   HARDWARE (Phần cứng: CPU xử lý, RAM lưu, SSD chứa file)   |
++------------------------------------+
+
+4. Ràng buộc & Bẫy dữ liệu (Critical Questions)
+a. Điều gì xảy ra khi cố gắng End Task tiến trình System?
+Tiến trình System (PID 4 trên Windows) là tiến trình lõi chứa các luồng thực thi ở cấp độ Kernel (Kernel-mode threads).
+Hệ điều hành đã thiết lập cơ chế bảo vệ: Nếu bạn tìm cách kết thúc System, Task Manager sẽ chặn lại và báo lỗi "Access Denied" hoặc cảnh báo nguy hiểm.
+Nếu dùng công cụ can thiệp sâu để buộc dừng System, hệ thống sẽ bị sập ngay lập tức và xuất hiện màn hình xanh (BSOD - Blue Screen of Death) để bảo vệ toàn vẹn dữ liệu.
+b. Dự đoán sự khác biệt hiệu suất giữa SSD và HDD khi RAM đầy (Swap File)
+Tiêu chí
+Sử dụng ổ HDD
+Sử dụng ổ SSD
+Tốc độ đọc/ghi Swap
+Rất chậm (~100 - 150 MB/s).
+Rất nhanh (~500 - 7000 MB/s).
+Thời gian truy xuất
+Độ trễ cao (Seek time lớn do cơ học).
+Độ trễ cực thấp (Truy xuất chip nhớ).
+Trải nghiệm người dùng
+Máy bị "đóng băng" (Freeze), đĩa quay liên tục 100% Active Time.
+Máy chỉ khựng nhẹ, vẫn có thể thao tác chuyển tab hoặc đóng ứng dụng.
